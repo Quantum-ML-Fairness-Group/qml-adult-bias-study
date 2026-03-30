@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import pennylane as qml
-from .quantum_circuits import get_ang_entangling_qnode
+from .quantum_circuits import get_ang_entangling_qnode, get_qcnn_qnode
 import numpy as np
 
 
@@ -24,6 +24,22 @@ class HybridMLP(nn.Module):
         # return self.linear(q_out)
         return q_out.unsqueeze(1)
     
+
+class HybridQCNNMLP(nn.Module):
+    def __init__(self, n_qubits, n_layers, input_dim, dev, diff_method):
+        super().__init__()
+        qcnn_qnode, weight_shapes = get_qcnn_qnode(dev, n_qubits, diff_method)
+        self.pre_net = nn.Sequential(
+            nn.Linear(input_dim, n_qubits),
+            nn.Tanh()
+        )
+        self.qlayer = qml.qnn.TorchLayer(qcnn_qnode, weight_shapes)
+
+    def forward(self, x):
+        x = self.pre_net(x) * np.pi
+        q_out = self.qlayer(x)
+        return q_out.unsqueeze(1)
+
 
 class ClassicalMLP(nn.Module):
     def __init__(self, input_dim,hidden_dim):
